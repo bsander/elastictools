@@ -1,0 +1,94 @@
+#!/usr/bin/env node
+
+'use strict';
+
+var nconf = require('nconf');
+var request = require('request');
+var _ = require('lodash');
+var pace;
+
+var scroll_id;
+var scrolled;
+
+nconf.argv({
+    'i': {
+        describe: 'The old index which contains your data',
+        demand: true
+    },
+    'o': {
+        describe: 'The new index',
+        demand: true
+    },
+    'h': {
+        describe: 'Elasticsearch cluster API endpoint',
+        default: 'http://localhost:9200'
+    }
+});
+
+function scan() {
+    request.get({
+        url: [nconf.get('h'), nconf.get('i'), '_search'].join('/') + '?search_type=scan&scroll=1m&size=10',
+        json: {
+            query: {
+                match_all: {}
+            }
+        }
+    }, function (err, res, body) {
+        scroll_id = body._scroll_id;
+        scrolled = 0;
+        pace = require('pace')(body.hits.total);
+        scroll();
+    });
+}
+
+function scroll() {
+    request.get({
+        url: [nconf.get('h'), '_search', 'scroll'].join('/') + '/?scroll=1m',
+        body: scroll_id,
+        json: true
+    }, function (err, res, body) {
+        var hits = body.hits.hits;
+        if (!hits.length) {
+            return;
+        }
+        scroll_id = body._scroll_id;
+        scrolled += hits.length;
+        insert(hits, function () {
+            _.defer(scroll);
+        });
+    });
+}
+
+function submitBulkRequest(data, callback) {
+    request.post({
+        url: [nconf.get('h'), '_bulk'].join('/'),
+        body: data,
+        json: true
+    }, function (err, res, body) {
+        callback();
+    });
+}
+
+function createBulkRequest(items, callback) {
+    var bulk = _.map(items, function (item) {
+        return [JSON.stringify({
+                index: {
+                    _index: nconf.get('o'),
+                    _type: item._type,
+                    _id: item._id
+                }
+            }),
+            JSON.stringify(item._source)];
+    });
+    bulk = _.flatten(bulk).join('\n') + '\n';
+    submitBulkRequest(bulk, callback)
+}
+
+function insert(items, callback) {
+    var bulk = createBulkRequest(items, function () {
+        pace.op(scrolled);
+        callback && callback();
+    });
+}
+
+scan();

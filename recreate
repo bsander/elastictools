@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+
+curl -XDELETE "localhost:9200/$1"
+echo "\n"
+curl -XPUT "localhost:9200/$1" -d @$2
