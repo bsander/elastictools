@@ -1,0 +1,34 @@
+#!/usr/bin/env sh
+if [ -z "$1" ]
+then
+  echo Please apply an input CSV
+  exit 1
+fi
+if [ -z "$2" ]
+then
+  filename=$(basename "$1")
+  outputFile="${filename%.*}_generated.txt"
+else
+  outputFile="$2"
+fi
+
+
+while read line
+do
+  #expected response example: {"tokens":[{"token":"wlan kennwort,wlan schlussel","start_offset":0,"end_offset":28,"type":"word","position":1}]}
+  response=$(curl -s -XGET "localhost:9200/_analyze?tokenizer=keyword&filters=lowercase,asciifolding" -d "$line" | jq -r '.tokens[0].token')
+
+  if [ -n "$response" ]
+  then
+    if [ -n "$outputResponse" ]
+    then
+      #only add newline if outputresponse already exists
+      outputResponse=$outputResponse$"\n"
+    fi
+
+    #concatenate string
+    outputResponse=$outputResponse$response
+  fi
+done < $1
+
+echo $outputResponse >> $outputFile
