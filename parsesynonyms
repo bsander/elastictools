@@ -1,34 +1,49 @@
 #!/usr/bin/env sh
+
+# Parameters:
+# $1 = input filename
+# $2 = server, defaults to localhost:9200
+# $3 = output filename, defaults to [input filename]_generated.txt
+
 if [ -z "$1" ]
 then
-  echo Please apply an input CSV
+  echo Please apply an input file
   exit 1
 fi
 if [ -z "$2" ]
 then
+  server="localhost:9200"
+else
+  server="$2"
+fi
+if [ -z "$3" ]
+then
   filename=$(basename "$1")
   outputFile="${filename%.*}_generated.txt"
 else
-  outputFile="$2"
+  outputFile="$3"
 fi
 
 
 while read line
 do
   #expected response example: {"tokens":[{"token":"wlan kennwort,wlan schlussel","start_offset":0,"end_offset":28,"type":"word","position":1}]}
-  response=$(curl -s -XGET "localhost:9200/_analyze?tokenizer=keyword&filters=lowercase,asciifolding" -d "$line" | jq -r '.tokens[0].token')
+  response=$(curl -s -XGET "$server/_analyze?tokenizer=keyword&filters=lowercase,asciifolding" -d "$line" | jq -r '.tokens[0].token | tostring')
 
-  if [ -n "$response" ]
+  if [ -z "$response" ] || [ "$response" = "null" ]
   then
-    if [ -n "$outputResponse" ]
-    then
-      #only add newline if outputresponse already exists
-      outputResponse=$outputResponse$"\n"
-    fi
-
-    #concatenate string
-    outputResponse=$outputResponse$response
+    echo Elasticsearch returned a malformed response
+    exit 2
   fi
+
+  if [ -n "$outputResponse" ]
+  then
+    #only add newline if outputresponse already exists
+    outputResponse=$outputResponse$"\n"
+  fi
+
+  #concatenate string
+  outputResponse=$outputResponse$response
 done < $1
 
-echo $outputResponse >> $outputFile
+echo $outputResponse > $outputFile
