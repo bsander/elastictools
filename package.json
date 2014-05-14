@@ -12,5 +12,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "bin": {
+    "recreate": "./recreate",
+    "reindex": "./reindex",
+    "crawlstatesync": "./crawlstatesync.sh",
+    "pipedelete": "./pipedelete.sh"
+  },
   "author": "Sander Bouwhuis"
 }

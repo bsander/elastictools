@@ -1,7 +1,7 @@
 # Elastic tools
 
 ## Installation
-`npm install`
+`npm install -g .`
 
 ## Tools
 ### Recreate
