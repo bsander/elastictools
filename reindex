@@ -19,6 +19,10 @@ nconf.argv({
         describe: 'The new index',
         demand: true
     },
+    'n': {
+        describe: '# Of records per shard to scan',
+        default: 25
+    },
     'h': {
         describe: 'Elasticsearch cluster API endpoint',
         default: 'http://localhost:9200'
@@ -27,7 +31,7 @@ nconf.argv({
 
 function scan() {
     request.get({
-        url: [nconf.get('h'), nconf.get('i'), '_search'].join('/') + '?search_type=scan&scroll=1m&size=10',
+        url: [nconf.get('h'), nconf.get('i'), '_search'].join('/') + '?search_type=scan&scroll=1m&size=' + nconf.get('n'),
         json: {
             query: {
                 match_all: {}
@@ -63,8 +67,12 @@ function submitBulkRequest(data, callback) {
     request.post({
         url: [nconf.get('h'), '_bulk'].join('/'),
         body: data,
-        json: true
+        json: true,
+        timeout: 600000 // 10m
     }, function (err, res, body) {
+        if(err || res.statusCode !== 200) {
+            console.log(err, res.statusCode, body);
+        }
         callback();
     });
 }
