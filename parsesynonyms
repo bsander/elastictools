@@ -24,11 +24,13 @@ else
   outputFile="$3"
 fi
 
+# Create test index for analysis
+curl -s -XPUT "$server/parse-synonyms-utility-index" -d "$(jq -n '{settings:{analysis:{analyzer:{synonyms:{type:"custom",tokenizer:"commasep",filter:["trim","asciifolding","lowercase","unique"]}},tokenizer:{commasep:{type:"pattern",pattern:","}}}}}')" > /dev/null
 
-while read line
-do
-  #expected response example: {"tokens":[{"token":"wlan kennwort,wlan schlussel","start_offset":0,"end_offset":28,"type":"word","position":1}]}
-  response=$(curl -s -XGET "$server/_analyze?tokenizer=keyword&filters=lowercase,asciifolding" -d "$line" | jq -r '.tokens[0].token | tostring')
+while read line; do
+  # sample input: cimodule,ciplusmodule,,,
+  # expected response example: {"tokens":[{"token":"cimodule","start_offset":0,"end_offset":8,"type":"word","position":1},{"token":"ciplusmodule","start_offset":9,"end_offset":21,"type":"word","position":2}]}
+  response=$(curl -s -XGET "$server/parse-synonyms-utility-index/_analyze?analyzer=synonyms" -d "$line" | jq -r '[.tokens[].token] | join(",")')
 
   if [ -z "$response" ] || [ "$response" = "null" ]
   then
